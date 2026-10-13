@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}Interactive SQL Console - Sports Club DBMS{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h2 class="fw-bold mb-1">Interactive SQL Console & Evaluator</h2>
+        <p class="text-muted mb-0">Execute ad-hoc SELECT queries, joins, aggregations, and subqueries on the normalized live database</p>
+    </div>
+</div>
+
+<!-- Preset Sample Queries -->
+<div class="card mb-4">
+    <div class="card-header bg-white py-2">
+        <span class="fw-bold text-muted small text-uppercase"><i class="fa-solid fa-lightbulb text-warning me-1"></i> Quick Pre-built Queries (Click to load):</span>
+    </div>
+    <div class="card-body py-2">
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-sm btn-outline-secondary" onclick="setQuery(q1)">Multi-Table Join (Member Profile)</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="setQuery(q2)">Fixture Details (4-way Join)</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="setQuery(q3)">Sport-wise Revenue (Aggregation)</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="setQuery(q4)">High Demand Facilities (HAVING)</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="setQuery(q5)">Non-Correlated Subquery (Never Borrowed)</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="setQuery(q6)">Correlated Subquery (Above Avg Payment)</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="setQuery(q7)">Window Function (DENSE_RANK)</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="setQuery(q8)">Tournament Standings View</button>
+        </div>
+    </div>
+</div>
+
+<!-- SQL Editor Form -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('sql_console') }}">
+            <div class="mb-3">
+                <label class="form-label fw-bold">SQL Query Input (SELECT statements only):</label>
+                <textarea name="sql_query" id="sqlQueryInput" rows="6" class="form-control sql-editor" required>{{ sql_query }}</textarea>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="small text-muted">
+                    <i class="fa-solid fa-lock text-success me-1"></i> Read-only safety active. Transaction-protected execution.
+                </div>
+                <button type="submit" class="btn btn-primary px-4 fw-bold">
+                    <i class="fa-solid fa-play me-1"></i> Run SQL Query
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Query Results Display -->
+{% if result %}
+<div class="card">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <h5 class="fw-bold mb-0"><i class="fa-solid fa-table text-primary me-2"></i> Query Execution Output</h5>
+        {% if not result.error %}
+            <span class="badge bg-success bg-opacity-25 text-success border border-success">Returned {{ result.count }} Row(s)</span>
+        {% else %}
+            <span class="badge bg-danger">Execution Failed</span>
+        {% endif %}
+    </div>
+    <div class="card-body p-0">
+        {% if result.error %}
+            <div class="p-4">
+                <div class="alert alert-danger mb-0">
+                    <i class="fa-solid fa-circle-xmark me-2"></i><strong>Database Error:</strong> {{ result.error }}
+                </div>
+            </div>
+        {% else %}
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle mb-0 font-monospace small">
+                    <thead>
+                        <tr>
+                            {% for col in result.columns %}
+                            <th>{{ col }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in result.rows %}
+                        <tr>
+                            {% for val in row %}
+                            <td>{{ val if val is not none else 'NULL' }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="{{ result.columns|length }}" class="text-center py-4 text-muted">Query executed successfully but returned 0 rows.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<script>
+const q1 = `SELECT 
+    m.member_id,
+    m.first_name || ' ' || m.last_name AS member_name,
+    m.email,
+    COALESCE(mp.plan_name, 'No Plan') AS plan,
+    COALESCE(t.team_name, 'Unassigned') AS team,
+    COUNT(DISTINCT el.loan_id) AS active_loans
+FROM members m
+LEFT JOIN member_subscriptions ms ON m.member_id = ms.member_id AND ms.status = 'ACTIVE'
+LEFT JOIN membership_plans mp ON ms.plan_id = mp.plan_id
+LEFT JOIN team_roster tr ON m.member_id = tr.member_id AND tr.is_active = 1
+LEFT JOIN teams t ON tr.team_id = t.team_id
+LEFT JOIN equipment_loans el ON m.member_id = el.member_id AND el.status = 'ISSUED'
+GROUP BY m.member_id;`;
+
+const q2 = `SELECT 
+    f.fixture_id,
+    t.tournament_name,
+    s.sport_name,
+    f.stage,
+    p1.display_name AS competitor_1,
+    p2.display_name AS competitor_2,
+    fac.facility_name,
+    f.fixture_date,
+    COALESCE(mr.score_participant1 || ' - ' || mr.score_participant2, 'Pending') AS score
+FROM fixtures f
+JOIN tournaments t ON f.tournament_id = t.tournament_id
+JOIN sports s ON t.sport_id = s.sport_id
+JOIN tournament_participants p1 ON f.participant1_id = p1.participant_id
+JOIN tournament_participants p2 ON f.participant2_id = p2.participant_id
+JOIN facilities fac ON f.facility_id = fac.facility_id
+LEFT JOIN match_results mr ON f.fixture_id = mr.fixture_id;`;
+
+const q3 = `SELECT 
+    s.sport_name,
+    s.category,
+    COUNT(DISTINCT f.facility_id) AS total_facilities,
+    COUNT(DISTINCT ts.session_id) AS training_sessions,
+    COALESCE(SUM(fb.total_fee), 0.0) AS booking_revenue
+FROM sports s
+LEFT JOIN facilities f ON s.sport_id = f.sport_id
+LEFT JOIN facility_bookings fb ON f.facility_id = fb.facility_id AND fb.status = 'CONFIRMED'
+LEFT JOIN training_sessions ts ON s.sport_id = ts.sport_id
+GROUP BY s.sport_id, s.sport_name;`;
+
+const q4 = `SELECT 
+    f.facility_name,
+    s.sport_name,
+    f.capacity,
+    f.hourly_rate,
+    COUNT(fb.booking_id) AS bookings_count,
+    SUM(fb.total_fee) AS total_revenue
+FROM facilities f
+JOIN sports s ON f.sport_id = s.sport_id
+JOIN facility_bookings fb ON f.facility_id = fb.facility_id
+WHERE fb.status = 'CONFIRMED'
+GROUP BY f.facility_id, f.facility_name, s.sport_name, f.capacity, f.hourly_rate
+HAVING COUNT(fb.booking_id) >= 1;`;
+
+const q5 = `SELECT 
+    member_id,
+    first_name || ' ' || last_name AS member_name,
+    email,
+    phone,
+    status
+FROM members
+WHERE member_id NOT IN (
+    SELECT DISTINCT member_id 
+    FROM equipment_loans
+);`;
+
+const q6 = `SELECT 
+    m.member_id,
+    m.first_name || ' ' || m.last_name AS member_name,
+    p.amount AS transaction_amount,
+    p.payment_method,
+    p.transaction_ref
+FROM members m
+JOIN payments p ON m.member_id = p.member_id
+WHERE p.amount > (
+    SELECT AVG(amount) 
+    FROM payments
+);`;
+
+const q7 = `SELECT 
+    m.member_id,
+    m.first_name || ' ' || m.last_name AS member_name,
+    SUM(p.amount) AS total_paid,
+    DENSE_RANK() OVER (ORDER BY SUM(p.amount) DESC) AS payment_rank
+FROM members m
+JOIN payments p ON m.member_id = p.member_id
+GROUP BY m.member_id;`;
+
+const q8 = `SELECT * FROM v_tournament_standings;`;
+
+function setQuery(q) {
+    document.getElementById('sqlQueryInput').value = q;
+}
+</script>
+{% endblock %}

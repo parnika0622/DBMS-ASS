@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}Teams & Coaches - Sports Club DBMS{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h2 class="fw-bold mb-1">Teams & Roster Management</h2>
+        <p class="text-muted mb-0">Form sports teams, assign licensed coaches, and manage member player rosters</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createTeamModal">
+            <i class="fa-solid fa-plus me-1"></i> Form New Team
+        </button>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Teams List Column -->
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header bg-white py-3">
+                <h5 class="fw-bold mb-0"><i class="fa-solid fa-people-group text-primary me-2"></i> Club Teams</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for t in teams %}
+                <a href="{{ url_for('teams', team_id=t.team_id) }}" class="list-group-item list-group-item-action p-3 {% if selected_team and selected_team.team_id == t.team_id %}active{% endif %}">
+                    <div class="d-flex w-100 justify-content-between align-items-center">
+                        <h6 class="mb-1 fw-bold">{{ t.team_name }}</h6>
+                        <span class="badge {% if selected_team and selected_team.team_id == t.team_id %}bg-light text-dark{% else %}bg-primary{% endif %}">
+                            {{ t.sport_name }}
+                        </span>
+                    </div>
+                    <div class="small mt-1 opacity-75">
+                        <div><i class="fa-solid fa-user-tie me-1"></i> Coach: {{ t.coach_name }}</div>
+                        <div><i class="fa-solid fa-shield-halved me-1"></i> Captain: {{ t.captain_name }} &bull; {{ t.total_players }} Player(s)</div>
+                    </div>
+                </a>
+                {% else %}
+                <div class="p-4 text-center text-muted">No teams created yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Team Details & Roster Column -->
+    <div class="col-lg-7">
+        <div class="card h-100">
+            {% if selected_team %}
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="fw-bold mb-0">{{ selected_team.team_name }}</h5>
+                    <span class="badge bg-secondary small mt-1">{{ selected_team.sport_name }}</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addPlayerModal">
+                    <i class="fa-solid fa-user-plus me-1"></i> Add Player to Roster
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Jersey #</th>
+                                <th>Player Name</th>
+                                <th>Position</th>
+                                <th>Contact</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in roster %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-dark rounded-circle p-2">#{{ r.jersey_number or '-' }}</span>
+                                </td>
+                                <td class="fw-bold">{{ r.member_name }}</td>
+                                <td><span class="badge bg-light text-dark border">{{ r.position or 'Unassigned' }}</span></td>
+                                <td class="small text-muted">{{ r.email }}</td>
+                                <td>
+                                    <span class="badge bg-success bg-opacity-25 text-success border border-success">
+                                        {{ r.member_status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">No players enrolled in this team roster yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% else %}
+            <div class="card-body text-center py-5 text-muted">
+                <i class="fa-solid fa-shield-halved fa-3x mb-3 text-secondary opacity-50"></i>
+                <h5>Select a team on the left to view its roster and squad members</h5>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Create Team -->
+<div class="modal fade" id="createTeamModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('create_team') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Form New Team</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Team Name *</label>
+                        <input type="text" name="team_name" class="form-control" required placeholder="e.g. Phoenix Titans">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Sport *</label>
+                        <select name="sport_id" class="form-select" required>
+                            {% for s in sports %}
+                            <option value="{{ s.sport_id }}">{{ s.sport_name }} ({{ s.category }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Assign Coach (Optional)</label>
+                        <select name="coach_id" class="form-select">
+                            <option value="">-- No Coach Assigned --</option>
+                            {% for c in coaches %}
+                            <option value="{{ c.coach_id }}">{{ c.first_name }} {{ c.last_name }} ({{ c.sport_name }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Assign Team Captain (Optional)</label>
+                        <select name="captain_id" class="form-select">
+                            <option value="">-- No Captain Assigned --</option>
+                            {% for m in members %}
+                            <option value="{{ m.member_id }}">{{ m.first_name }} {{ m.last_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Form Team</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add Player to Roster -->
+{% if selected_team %}
+<div class="modal fade" id="addPlayerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('add_player_to_team') }}">
+                <input type="hidden" name="team_id" value="{{ selected_team.team_id }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Enroll Player to {{ selected_team.team_name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Select Active Member *</label>
+                        <select name="member_id" class="form-select" required>
+                            {% for m in members %}
+                            <option value="{{ m.member_id }}">{{ m.first_name }} {{ m.last_name }} ({{ m.email }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Jersey Number (1 - 99)</label>
+                        <input type="number" name="jersey_number" class="form-control" min="1" max="99" placeholder="e.g. 7">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Position / Role</label>
+                        <input type="text" name="position" class="form-control" placeholder="e.g. Forward, Midfielder, Goalkeeper">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add to Roster</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

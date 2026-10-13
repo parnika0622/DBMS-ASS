@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Facilities & Bookings - Sports Club DBMS{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h2 class="fw-bold mb-1">Facilities & Booking Management</h2>
+        <p class="text-muted mb-0">Book sports courts, turfs, and arenas with automatic overlap conflict prevention</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookFacilityModal">
+            <i class="fa-solid fa-calendar-plus me-1"></i> New Reservation
+        </button>
+    </div>
+</div>
+
+<!-- Facilities Overview Cards -->
+<div class="row g-3 mb-4">
+    {% for f in facilities %}
+    <div class="col-md-4 col-sm-6">
+        <div class="card h-100 p-3">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <h6 class="fw-bold mb-0">{{ f.facility_name }}</h6>
+                    <span class="badge bg-primary bg-opacity-10 text-primary small">{{ f.sport_name }} &bull; {{ f.facility_type }}</span>
+                </div>
+                {% if f.is_operational %}
+                    <span class="badge bg-success bg-opacity-25 text-success border border-success">Open</span>
+                {% else %}
+                    <span class="badge bg-danger">Maintenance</span>
+                {% endif %}
+            </div>
+            <div class="d-flex justify-content-between text-muted small mt-2 pt-2 border-top">
+                <span><i class="fa-solid fa-users me-1"></i> Capacity: <strong>{{ f.capacity }}</strong></span>
+                <span><i class="fa-solid fa-tag me-1"></i> Rate: <strong>${{ f.hourly_rate }}/hr</strong></span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Filter and Bookings Table -->
+<div class="card">
+    <div class="card-header bg-white py-3">
+        <form method="GET" action="{{ url_for('facilities') }}" class="row g-2 align-items-center">
+            <div class="col-md-4">
+                <select name="facility_id" class="form-select">
+                    <option value="">All Facilities</option>
+                    {% for f in facilities %}
+                    <option value="{{ f.facility_id }}" {% if facility_filter and facility_filter|int == f.facility_id %}selected{% endif %}>
+                        {{ f.facility_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="date" name="date" class="form-control" value="{{ date_filter or '' }}">
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-secondary"><i class="fa-solid fa-filter me-1"></i> Filter</button>
+                <a href="{{ url_for('facilities') }}" class="btn btn-outline-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Booking #</th>
+                        <th>Facility</th>
+                        <th>Booked Entity</th>
+                        <th>Date & Time Slot</th>
+                        <th>Purpose</th>
+                        <th>Attendees</th>
+                        <th>Total Fee</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for b in bookings %}
+                    <tr>
+                        <td class="text-muted small">#{{ b.booking_id }}</td>
+                        <td class="fw-bold">{{ b.facility_name }}</td>
+                        <td>{{ b.booked_by }}</td>
+                        <td>
+                            <div><i class="fa-regular fa-calendar small text-muted me-1"></i>{{ b.booking_date }}</div>
+                            <div class="small text-muted"><i class="fa-regular fa-clock small me-1"></i>{{ b.start_time }} - {{ b.end_time }}</div>
+                        </td>
+                        <td><span class="badge bg-light text-dark border">{{ b.booking_purpose }}</span></td>
+                        <td>{{ b.attendees_count }}</td>
+                        <td class="fw-bold text-success">${{ "%.2f"|format(b.total_fee) }}</td>
+                        <td>
+                            <span class="badge {% if b.status == 'CONFIRMED' %}bg-success{% else %}bg-secondary{% endif %}">
+                                {{ b.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">No reservations recorded for this selection.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Book Facility -->
+<div class="modal fade" id="bookFacilityModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('book_facility') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-calendar-plus text-primary me-2"></i> Book Club Facility</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Select Facility *</label>
+                            <select name="facility_id" class="form-select" required>
+                                {% for f in facilities %}
+                                <option value="{{ f.facility_id }}">{{ f.facility_name }} (${{ f.hourly_rate }}/hr &bull; Cap: {{ f.capacity }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Booking Entity Type</label>
+                            <select name="book_type" id="bookTypeSelect" class="form-select" onchange="toggleBookingEntity()">
+                                <option value="member">Individual Member</option>
+                                <option value="team">Club Team</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6" id="memberSelectDiv">
+                            <label class="form-label fw-semibold">Select Active Member</label>
+                            <select name="member_id" class="form-select">
+                                {% for m in members %}
+                                <option value="{{ m.member_id }}">{{ m.first_name }} {{ m.last_name }} ({{ m.email }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 d-none" id="teamSelectDiv">
+                            <label class="form-label fw-semibold">Select Team</label>
+                            <select name="team_id" class="form-select">
+                                {% for t in teams %}
+                                <option value="{{ t.team_id }}">{{ t.team_name }} ({{ t.sport_name }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Booking Date *</label>
+                            <input type="date" name="booking_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Start Time *</label>
+                            <input type="time" name="start_time" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">End Time *</label>
+                            <input type="time" name="end_time" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Booking Purpose</label>
+                            <select name="purpose" class="form-select">
+                                <option value="CASUAL_PLAY">Casual Play</option>
+                                <option value="TRAINING">Training Session</option>
+                                <option value="TOURNAMENT_MATCH">Tournament Match</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Attendees Count</label>
+                            <input type="number" name="attendees_count" class="form-control" min="1" value="2" required>
+                        </div>
+                    </div>
+                    <div class="alert alert-info small mt-3 mb-0">
+                        <i class="fa-solid fa-shield-halved me-1"></i> <strong>Integrity Guarantee:</strong> Database trigger <code>trg_prevent_facility_booking_overlap</code> will abort overlapping bookings and enforce active membership validation.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Confirm Booking</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleBookingEntity() {
+    const val = document.getElementById('bookTypeSelect').value;
+    const mDiv = document.getElementById('memberSelectDiv');
+    const tDiv = document.getElementById('teamSelectDiv');
+    if (val === 'member') {
+        mDiv.classList.remove('d-none');
+        tDiv.classList.add('d-none');
+    } else {
+        mDiv.classList.add('d-none');
+        tDiv.classList.remove('d-none');
+    }
+}
+</script>
+{% endblock %}

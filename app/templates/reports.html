@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}Analytical Reports - Sports Club DBMS{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h2 class="fw-bold mb-1">Analytical Reports & Views</h2>
+        <p class="text-muted mb-0">Dynamic relational queries, aggregations, and business intelligence reports</p>
+    </div>
+</div>
+
+<!-- Tab Navigation -->
+<ul class="nav nav-pills mb-4 bg-white p-2 rounded-3 border shadow-sm">
+    <li class="nav-item">
+        <a class="nav-link {% if active_tab == 'memberships' %}active{% endif %}" href="{{ url_for('reports', tab='memberships') }}">
+            <i class="fa-solid fa-id-card me-1"></i> Active Memberships
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if active_tab == 'standings' %}active{% endif %}" href="{{ url_for('reports', tab='standings') }}">
+            <i class="fa-solid fa-list-ol me-1"></i> Tournament Standings
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if active_tab == 'facilities' %}active{% endif %}" href="{{ url_for('reports', tab='facilities') }}">
+            <i class="fa-solid fa-chart-pie me-1"></i> Facility Utilization
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if active_tab == 'players' %}active{% endif %}" href="{{ url_for('reports', tab='players') }}">
+            <i class="fa-solid fa-person-running me-1"></i> Player Performance
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if active_tab == 'dues' %}active{% endif %}" href="{{ url_for('reports', tab='dues') }}">
+            <i class="fa-solid fa-circle-exclamation me-1"></i> Fee Defaulters
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if active_tab == 'equipment' %}active{% endif %}" href="{{ url_for('reports', tab='equipment') }}">
+            <i class="fa-solid fa-boxes-stacked me-1"></i> Equipment Status
+        </a>
+    </li>
+</ul>
+
+<!-- Report Content Table -->
+<div class="card">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="fw-bold mb-0">
+                {% if active_tab == 'memberships' %}
+                    <i class="fa-solid fa-id-card text-primary me-2"></i> Report: Active Memberships (<code>v_active_memberships</code>)
+                {% elif active_tab == 'standings' %}
+                    <i class="fa-solid fa-list-ol text-primary me-2"></i> Report: Tournament League Standings (<code>v_tournament_standings</code>)
+                {% elif active_tab == 'facilities' %}
+                    <i class="fa-solid fa-chart-pie text-primary me-2"></i> Report: Facility Utilization & Revenue (<code>v_facility_utilization</code>)
+                {% elif active_tab == 'players' %}
+                    <i class="fa-solid fa-person-running text-primary me-2"></i> Report: Player Performance & Win Rate (<code>v_player_performance</code>)
+                {% elif active_tab == 'dues' %}
+                    <i class="fa-solid fa-circle-exclamation text-danger me-2"></i> Report: Outstanding Fee Dues & Delinquency (<code>v_fee_dues</code>)
+                {% elif active_tab == 'equipment' %}
+                    <i class="fa-solid fa-boxes-stacked text-primary me-2"></i> Report: Equipment Inventory & Overdue Checkouts (<code>v_equipment_status</code>)
+                {% endif %}
+            </h5>
+            <small class="text-muted">Generated live from database materialized/stored relational views</small>
+        </div>
+        <span class="badge bg-secondary">{{ report_data|length }} Record(s)</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                {% if active_tab == 'memberships' %}
+                <thead>
+                    <tr>
+                        <th>Member Name</th>
+                        <th>Email / Phone</th>
+                        <th>Plan</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Days Remaining</th>
+                        <th>Payment Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in report_data %}
+                    <tr>
+                        <td class="fw-bold">{{ r.full_name }}</td>
+                        <td>
+                            <div>{{ r.email }}</div>
+                            <small class="text-muted">{{ r.phone }}</small>
+                        </td>
+                        <td><span class="badge bg-primary">{{ r.plan_name }}</span></td>
+                        <td>{{ r.start_date }}</td>
+                        <td>{{ r.end_date }}</td>
+                        <td>
+                            <span class="badge {% if r.days_remaining < 30 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                {{ r.days_remaining }} days
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success">
+                                {{ r.payment_status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+                {% elif active_tab == 'standings' %}
+                <thead>
+                    <tr>
+                        <th>Tournament</th>
+                        <th>Participant / Team</th>
+                        <th>Played</th>
+                        <th>Won</th>
+                        <th>Drawn</th>
+                        <th>Lost</th>
+                        <th>Score For</th>
+                        <th>Score Against</th>
+                        <th>Difference</th>
+                        <th>Points</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in report_data %}
+                    <tr>
+                        <td class="small">{{ r.tournament_name }}</td>
+                        <td class="fw-bold">{{ r.display_name }}</td>
+                        <td>{{ r.matches_played }}</td>
+                        <td><span class="badge bg-success">{{ r.won }}</span></td>
+                        <td>{{ r.drawn }}</td>
+                        <td><span class="badge bg-danger">{{ r.lost }}</span></td>
+                        <td>{{ r.score_for }}</td>
+                        <td>{{ r.score_against }}</td>
+                        <td class="fw-semibold {% if r.score_diff > 0 %}text-success{% elif r.score_diff < 0 %}text-danger{% endif %}">
+                            {{ r.score_diff }}
+                        </td>
+                        <td><span class="badge bg-dark fs-6">{{ r.total_points }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+                {% elif active_tab == 'facilities' %}
+                <thead>
+                    <tr>
+                        <th>Facility Name</th>
+                        <th>Sport</th>
+                        <th>Type</th>
+                        <th>Capacity</th>
+                        <th>Rate ($/hr)</th>
+                        <th>Total Bookings</th>
+                        <th>Total Hours</th>
+                        <th>Total Revenue</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in report_data %}
+                    <tr>
+                        <td class="fw-bold">{{ r.facility_name }}</td>
+                        <td>{{ r.sport_name }}</td>
+                        <td><span class="badge bg-light text-dark border">{{ r.facility_type }}</span></td>
+                        <td>{{ r.capacity }}</td>
+                        <td>${{ r.hourly_rate }}</td>
+                        <td>{{ r.total_confirmed_bookings }}</td>
+                        <td>{{ r.total_hours_booked }} hrs</td>
+                        <td class="fw-bold text-success">${{ "%.2f"|format(r.total_revenue_generated) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+                {% elif active_tab == 'players' %}
+                <thead>
+                    <tr>
+                        <th>Participant / Player</th>
+                        <th>Tournament</th>
+                        <th>Sport</th>
+                        <th>Matches Played</th>
+                        <th>Total Wins</th>
+                        <th>Win Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in report_data %}
+                    <tr>
+                        <td class="fw-bold">{{ r.display_name }}</td>
+                        <td>{{ r.tournament_name }}</td>
+                        <td>{{ r.sport_name }}</td>
+                        <td>{{ r.matches_played }}</td>
+                        <td><span class="badge bg-success">{{ r.wins }}</span></td>
+                        <td>
+                            <div class="fw-bold text-primary">{{ r.win_percentage or 0 }}%</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+                {% elif active_tab == 'dues' %}
+                <thead>
+                    <tr>
+                        <th>Member Name</th>
+                        <th>Contact</th>
+                        <th>Plan</th>
+                        <th>Amount Due</th>
+                        <th>Subscription Dates</th>
+                        <th>Payment Status</th>
+                        <th>Days Since Start</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in report_data %}
+                    <tr>
+                        <td class="fw-bold">{{ r.member_name }}</td>
+                        <td>
+                            <div>{{ r.email }}</div>
+                            <small class="text-muted">{{ r.phone }}</small>
+                        </td>
+                        <td>{{ r.plan_name }}</td>
+                        <td class="fw-bold text-danger">${{ "%.2f"|format(r.amount_due) }}</td>
+                        <td class="small">{{ r.start_date }} to {{ r.end_date }}</td>
+                        <td><span class="badge bg-danger">{{ r.payment_status }}</span></td>
+                        <td><span class="badge bg-warning text-dark">{{ r.days_since_start }} days</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+                {% elif active_tab == 'equipment' %}
+                <thead>
+                    <tr>
+                        <th>Equipment Item</th>
+                        <th>Sport</th>
+                        <th>Brand</th>
+                        <th>Total Stock</th>
+                        <th>Available</th>
+                        <th>Currently Loaned</th>
+                        <th>Condition</th>
+                        <th>Overdue Loans</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in report_data %}
+                    <tr>
+                        <td class="fw-bold">{{ r.equipment_name }}</td>
+                        <td>{{ r.sport_name }}</td>
+                        <td>{{ r.brand or 'Standard' }}</td>
+                        <td>{{ r.total_quantity }}</td>
+                        <td><span class="badge bg-success">{{ r.available_quantity }}</span></td>
+                        <td><span class="badge bg-warning text-dark">{{ r.currently_issued_quantity }}</span></td>
+                        <td><span class="badge bg-light text-dark border">{{ r.condition_status }}</span></td>
+                        <td>
+                            {% if r.overdue_loans_count > 0 %}
+                                <span class="badge bg-danger">{{ r.overdue_loans_count }} overdue</span>
+                            {% else %}
+                                <span class="text-muted small">0</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

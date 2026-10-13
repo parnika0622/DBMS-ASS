@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+
+{% block title %}Tournaments & Fixtures - Sports Club DBMS{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h2 class="fw-bold mb-1">Tournaments & Competition Fixtures</h2>
+        <p class="text-muted mb-0">Create tournaments, schedule match fixtures, record scores, and compute standings</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createTournModal">
+            <i class="fa-solid fa-trophy me-1"></i> New Tournament
+        </button>
+    </div>
+</div>
+
+<!-- Tournament Selector Tabs -->
+<div class="card mb-4">
+    <div class="card-body py-2">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-2">
+                <span class="fw-bold text-muted small text-uppercase">Select Tournament:</span>
+                <div class="dropdown">
+                    <button class="btn btn-outline-dark dropdown-toggle fw-semibold" type="button" data-bs-toggle="dropdown">
+                        {{ current_tournament.tournament_name if current_tournament else 'Select Tournament' }}
+                    </button>
+                    <ul class="dropdown-menu">
+                        {% for t in tournaments %}
+                        <li>
+                            <a class="dropdown-item" href="{{ url_for('tournaments', tournament_id=t.tournament_id) }}">
+                                {{ t.tournament_name }} ({{ t.sport_name }})
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            {% if current_tournament %}
+            <div class="d-flex flex-wrap gap-2 align-items-center small">
+                <span class="badge bg-primary">{{ current_tournament.sport_name }}</span>
+                <span class="badge bg-secondary">{{ current_tournament.format }}</span>
+                <span class="badge bg-success bg-opacity-25 text-success border border-success">{{ current_tournament.status }}</span>
+                <span class="text-muted"><i class="fa-regular fa-calendar me-1"></i> {{ current_tournament.start_date }} to {{ current_tournament.end_date }}</span>
+                <span class="fw-bold text-success"><i class="fa-solid fa-award me-1"></i> Prize: ${{ current_tournament.prize_pool }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if current_tournament %}
+<div class="row g-4">
+    <!-- Fixtures Column -->
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0"><i class="fa-solid fa-network-wired text-primary me-2"></i> Match Fixtures & Scores</h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createFixtureModal">
+                    <i class="fa-solid fa-plus me-1"></i> Schedule Fixture
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Stage</th>
+                                <th>Competitors</th>
+                                <th>Venue</th>
+                                <th>Date & Time</th>
+                                <th>Result / Score</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for f in fixtures %}
+                            <tr>
+                                <td><span class="badge bg-light text-dark border">{{ f.stage }}</span></td>
+                                <td>
+                                    <div class="fw-bold">{{ f.p1_name }}</div>
+                                    <div class="text-muted small">vs</div>
+                                    <div class="fw-bold">{{ f.p2_name }}</div>
+                                </td>
+                                <td class="small">{{ f.facility_name }}</td>
+                                <td>
+                                    <div class="small"><i class="fa-regular fa-calendar me-1"></i>{{ f.fixture_date }}</div>
+                                    <div class="small text-muted">{{ f.start_time }} - {{ f.end_time }}</div>
+                                </td>
+                                <td>
+                                    {% if f.status == 'COMPLETED' %}
+                                        <div class="fw-bold fs-6 text-primary">{{ f.score_participant1 }} - {{ f.score_participant2 }}</div>
+                                        <span class="badge bg-success bg-opacity-25 text-success border border-success small">
+                                            Winner: {{ f.winner_name or 'Draw' }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">{{ f.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#resultModal{{ f.fixture_id }}">
+                                        <i class="fa-solid fa-pen-to-square me-1"></i> Enter Score
+                                    </button>
+                                </td>
+                            </tr>
+
+                            <!-- Modal: Enter Match Result -->
+                            <div class="modal fade" id="resultModal{{ f.fixture_id }}" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form method="POST" action="{{ url_for('record_match_result') }}">
+                                            <input type="hidden" name="tournament_id" value="{{ current_tournament.tournament_id }}">
+                                            <input type="hidden" name="fixture_id" value="{{ f.fixture_id }}">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title fw-bold">Record Match Score (#{{ f.fixture_id }})</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="text-center mb-3">
+                                                    <h6>{{ f.p1_name }} vs {{ f.p2_name }}</h6>
+                                                    <span class="badge bg-light text-dark border">{{ f.stage }}</span>
+                                                </div>
+                                                <div class="row g-3">
+                                                    <div class="col-6">
+                                                        <label class="form-label fw-semibold">{{ f.p1_name }} Score *</label>
+                                                        <input type="number" name="score_p1" class="form-control" min="0" value="{{ f.score_participant1 or 0 }}" required>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label fw-semibold">{{ f.p2_name }} Score *</label>
+                                                        <input type="number" name="score_p2" class="form-control" min="0" value="{{ f.score_participant2 or 0 }}" required>
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <label class="form-label fw-semibold">Set Details / Breakdown</label>
+                                                        <input type="text" name="set_scores" class="form-control" placeholder="e.g. 21-18, 21-16 or 6-4, 6-3" value="{{ f.set_scores_details or '' }}">
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <label class="form-label fw-semibold">Referee / Match Notes</label>
+                                                        <input type="text" name="notes" class="form-control" placeholder="e.g. Fair play, yellow cards, MVP">
+                                                    </div>
+                                                </div>
+                                                <div class="alert alert-info small mt-3 mb-0">
+                                                    <i class="fa-solid fa-check-double me-1"></i> Saving score marks fixture as COMPLETED and updates <code>v_tournament_standings</code>.
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="submit" class="btn btn-primary">Save Score & Update Standings</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">No fixtures scheduled yet for this tournament.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Participants Column -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0"><i class="fa-solid fa-users text-primary me-2"></i> Participants</h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addPartModal">
+                    <i class="fa-solid fa-plus me-1"></i> Enroll
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for p in participants %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center p-3">
+                        <div>
+                            <div class="fw-bold">{{ p.display_name }}</div>
+                            <span class="badge bg-light text-muted border small">Seed #{{ p.seed_number or '-' }}</span>
+                        </div>
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success">{{ p.status }}</span>
+                    </div>
+                    {% else %}
+                    <div class="p-4 text-center text-muted">No participants registered yet.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Modal: Create Tournament -->
+<div class="modal fade" id="createTournModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('create_tournament') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Create New Tournament</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold">Tournament Title *</label>
+                            <input type="text" name="tournament_name" class="form-control" required placeholder="e.g. Club Invitational Badminton Masters 2026">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Sport *</label>
+                            <select name="sport_id" class="form-select" required>
+                                {% for s in sports %}
+                                <option value="{{ s.sport_id }}">{{ s.sport_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Tournament Format *</label>
+                            <select name="format" class="form-select">
+                                <option value="ROUND_ROBIN">Round Robin (League)</option>
+                                <option value="KNOCKOUT">Single Elimination Knockout</option>
+                                <option value="LEAGUE">League Table</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Start Date *</label>
+                            <input type="date" name="start_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">End Date *</label>
+                            <input type="date" name="end_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Entry Fee ($)</label>
+                            <input type="number" name="entry_fee" class="form-control" step="0.01" min="0" value="25.00">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Prize Pool ($)</label>
+                            <input type="number" name="prize_pool" class="form-control" step="0.01" min="0" value="500.00">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Tournament</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Schedule Fixture -->
+{% if current_tournament %}
+<div class="modal fade" id="createFixtureModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('create_fixture') }}">
+                <input type="hidden" name="tournament_id" value="{{ current_tournament.tournament_id }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Schedule Match Fixture</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Stage / Round *</label>
+                            <select name="stage" class="form-select" required>
+                                <option value="ROUND_OF_16">Round of 16</option>
+                                <option value="QUARTER_FINAL">Quarter Final</option>
+                                <option value="SEMI_FINAL">Semi Final</option>
+                                <option value="FINAL">Final</option>
+                                <option value="GROUP_STAGE">Group Stage</option>
+                                <option value="LEAGUE">League</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Venue / Facility *</label>
+                            <select name="facility_id" class="form-select" required>
+                                {% for f in facilities %}
+                                <option value="{{ f.facility_id }}">{{ f.facility_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Competitor 1 *</label>
+                            <select name="participant1_id" class="form-select" required>
+                                {% for p in participants %}
+                                <option value="{{ p.participant_id }}">{{ p.display_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Competitor 2 *</label>
+                            <select name="participant2_id" class="form-select" required>
+                                {% for p in participants %}
+                                <option value="{{ p.participant_id }}">{{ p.display_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Date *</label>
+                            <input type="date" name="fixture_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Start Time *</label>
+                            <input type="time" name="start_time" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">End Time *</label>
+                            <input type="time" name="end_time" class="form-control" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Schedule Fixture</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Enroll Participant -->
+<div class="modal fade" id="addPartModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('add_tournament_participant') }}">
+                <input type="hidden" name="tournament_id" value="{{ current_tournament.tournament_id }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Enroll Participant</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Participant Type</label>
+                        <select name="participant_type" id="partTypeSelect" class="form-select" onchange="togglePartType()">
+                            <option value="member">Individual Member</option>
+                            <option value="team">Club Team</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="partMemberDiv">
+                        <label class="form-label fw-semibold">Select Member</label>
+                        <select name="member_id" id="partMemberSelect" class="form-select" onchange="autoFillDisplayName()">
+                            {% for m in members %}
+                            <option value="{{ m.member_id }}">{{ m.first_name }} {{ m.last_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3 d-none" id="partTeamDiv">
+                        <label class="form-label fw-semibold">Select Team</label>
+                        <select name="team_id" id="partTeamSelect" class="form-select" onchange="autoFillDisplayName()">
+                            {% for t in teams %}
+                            <option value="{{ t.team_id }}">{{ t.team_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Display / Seed Name *</label>
+                        <input type="text" name="display_name" id="partDisplayName" class="form-control" required placeholder="Display Name">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Seed Number (Optional)</label>
+                        <input type="number" name="seed_number" class="form-control" min="1" placeholder="e.g. 1, 2">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Enroll Participant</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function togglePartType() {
+    const val = document.getElementById('partTypeSelect').value;
+    const mDiv = document.getElementById('partMemberDiv');
+    const tDiv = document.getElementById('partTeamDiv');
+    if (val === 'member') {
+        mDiv.classList.remove('d-none');
+        tDiv.classList.add('d-none');
+    } else {
+        mDiv.classList.add('d-none');
+        tDiv.classList.remove('d-none');
+    }
+    autoFillDisplayName();
+}
+
+function autoFillDisplayName() {
+    const val = document.getElementById('partTypeSelect').value;
+    const nameInput = document.getElementById('partDisplayName');
+    if (val === 'member') {
+        const sel = document.getElementById('partMemberSelect');
+        if (sel.options[sel.selectedIndex]) {
+            nameInput.value = sel.options[sel.selectedIndex].text;
+        }
+    } else {
+        const sel = document.getElementById('partTeamSelect');
+        if (sel.options[sel.selectedIndex]) {
+            nameInput.value = sel.options[sel.selectedIndex].text;
+        }
+    }
+}
+document.addEventListener('DOMContentLoaded', autoFillDisplayName);
+</script>
+{% endif %}
+{% endblock %}
